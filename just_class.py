@@ -19,6 +19,7 @@ import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.trades as trades
 from oandapyV20.exceptions import V20Error
 import oandapyV20.endpoints.pricing as pricing
+import logging
 
 
 def db_data_spitter(response):
@@ -510,4 +511,235 @@ class OANDAClient:
             return None
         except V20Error as e:
             print(f"Error closing trade: {e}")
+            return None
+
+
+class OANDAClientFriday_Edition:
+    def __init__(self, access_token, account_id, environment="practice"):
+        """
+        Initialize the OANDA API client.
+        :param access_token: (str) Your OANDA API token.
+        :param account_id: (str) Your OANDA account ID.
+        :param environment: (str) "practice" for demo, "live" for real trading.
+        """
+        self.account_id = account_id
+        self.client = oandapyV20.API(access_token=access_token, environment=environment)
+        self.db = DataDB_tracker()
+        self.now = datetime.datetime.now(datetime.timezone.utc)
+        self.is_friday = self.now.weekday()==4
+        self.check_if_close_trade_time()
+        logging.basicConfig(filename="Oanda_logging.log",
+                            level=logging.INFO,  format='%(asctime)s - %(levelname)s - %(filename)s - %(message)s')
+
+
+    
+    def count_trading_days(self, start_date, end_date):
+        
+        date_range = pd.date_range(start=start_date, end=end_date, freq='B')  
+        return len(date_range)-1 
+
+    def db_data_spitter(self, response):
+        try:
+            impor = response['orderFillTransaction']
+            data =  {
+                'pair':impor['instrument'],
+                'execution_time': impor['time'],
+                'type':impor['reason'],
+                'direction': 1 if float(impor['units']) > 0 else -1,
+                'units': impor['units'],
+                'price':float(impor['tradeOpened']['price'])
+                
+            }
+        except KeyError:
+            impor = response['orderCreateTransaction']
+            data =  {
+                'pair':impor['instrument'],
+                'execution_time': impor['gtdTime'],
+                'type':impor['type'],
+                'direction': 1 if float(impor['units']) > 0 else -1,
+                'units': impor['units'],
+                'price':float(impor['price'])
+                
+            }         
+        return data
+
+    def get_last_friday_execution_time():
+        """Returns the last Friday at 21:01 UTC in ISO format."""
+        now = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
+        last_friday = now - timedelta(days=(now.weekday() + 3) % 7) 
+        execution_time = last_friday.replace(hour=21, minute=1, second=0, microsecond=0)
+        return execution_time.strftime("%Y-%m-%dT%H:%M:%S.000000Z")
+
+
+    
+    def check_if_close_trade_time(self):
+        
+        trades = self.db.query_all(DataDB_tracker.FOREX_COLL)
+        trades_that_need_2_be_closed = []
+
+        now = self.now.date()
+        
+        for trade in trades:
+            execution_time = trade["execution_time"].rstrip("Z")[:26] 
+            execution_time = datetime.datetime.fromisoformat(execution_time)
+            trading_days_elapsed = self.count_trading_days(execution_time, now)
+
+            if trading_days_elapsed >= 10: #more than 2 weeks
+                trades_that_need_2_be_closed.append(trade)
+
+        for trade in trades_that_need_2_be_closed:
+            self.close_a_trade(trade['pair'])
+            self.db.delete_one(DataDB_tracker.FOREX_COLL, pair = trade['pair'])
+            logging.info(f"Trade has been closed with {trade['pair']}")
+        
+    def is_market_closed(self):
+        """Check if current time is between Friday 4:30 PM and Monday 1 AM UTC."""
+        if (self.now.weekday() == 4 and self.now.hour >= 16 and self.now.minute >= 30) or (self.now.weekday() == 5 or self.now.weekday() == 6) or (self.now.weekday() == 0 and self.now.hour < 1):
+            return True
+        return False
+
+
+        
+    def get_account_equity(self):
+        """
+        Fetch the account equity (balance including unrealized P/L).
+        :return: (float) Account equity.
+        """
+        try:
+            r = accounts.AccountSummary(self.account_id)
+            response = self.client.request(r)
+            return float(response["account"]["NAV"]) 
+        except V20Error as e:
+            logging.error(f"Error fetching account equity: {e}")
+            return None
+
+            
+            
+    def get_current_price(self, currency_pair):
+        """Get current price for the given currency pair"""
+        try:
+            params = {
+                'instruments': currency_pair
+            }
+            request = pricing.PricingInfo(self.account_id, params=params)
+            response = self.client.request(request)
+            price = float(response['prices'][0]['closeoutBid'])
+            return price
+        except V20Error as e:
+            logging.error(f"Error fetching current price for {currency_pair}: {e}")
+            return None
+
+    
+
+    def calculate_position_size(self, currency_pair, risk_percentage=1):
+        """Calculate position size based on account equity and stop loss."""
+        stop_loss_pips = 0.0200 if not currency_pair.endswith(("JPY", "TRY")) else 2.00
+        pip_value = 1 if not currency_pair.endswith(("JPY", "TRY")) else 10
+
+        balance = self.get_account_equity()
+        if balance is None:
+            return None
+
+        risk_amount = balance * (risk_percentage / 100)
+        current_price = self.get_current_price(currency_pair)
+        if current_price is None:
+            return None
+
+        pip_value_adjusted = pip_value * current_price
+        position_size = risk_amount / (stop_loss_pips * pip_value_adjusted)
+
+        return round(position_size, 0) 
+
+
+    def place_order(self, instrument, direction, risk_percentage=1):
+        """
+        Places an order. If the market is closed, a limit order is placed with an expiry before Monday 1:15 AM UTC.
+        direction: 1 for long, -1 for short.
+        """
+        
+
+        position = self.calculate_position_size(currency_pair=instrument, risk_percentage=risk_percentage)
+        if position is None:
+            logging.error("Failed to calculate position size.")
+            return None
+
+        current_price = self.get_current_price(instrument)
+        if current_price is None:
+            logging.error("Failed to fetch current price.")
+            return None
+    
+
+        position *= -1 if direction == -1 else 1  
+    
+
+        if self.is_market_closed():
+            order_type = "LIMIT"
+            price = str(current_price)  
+    
+
+            now = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
+            next_monday = now + timedelta(days=(7 - now.weekday()))  
+            expiry_time = next_monday.replace(hour=5, minute=15, second=0, microsecond=0)
+    
+            time_in_force = "GTD"
+            gtd_time = expiry_time.strftime("%Y-%m-%dT%H:%M:%S.000000Z")  
+        else:
+            order_type = "MARKET"
+            price = None
+            time_in_force = "FOK"  
+    
+        # Construct order data
+        order_data = {
+            "order": {
+                "instrument": instrument,
+                "units": str(position),
+                "type": order_type,
+                "timeInForce": time_in_force,
+                "positionFill": "DEFAULT"
+            }
+        }
+    
+        if price:
+            order_data["order"]["price"] = price  
+        if order_type == "LIMIT":
+            order_data["order"]["gtdTime"] = gtd_time  
+    
+
+        try:
+            r = orders.OrderCreate(self.account_id, data=order_data)
+            response = self.client.request(r)
+            print(response)
+            logging.info(f"Order placed: {instrument}")
+    
+            # Save order to database
+            data = self.db_data_spitter(response)
+            self.db.add_one(DataDB_tracker.FOREX_COLL, data)
+    
+            return response
+        except V20Error as e:
+            logging.error(f"Error placing order: {e}")
+            return None
+
+
+
+    
+    def close_a_trade(self, currency_pair):
+        """Close the first open trade for the specified currency pair."""
+        try:
+            r = trades.OpenTrades(self.account_id)
+            response = self.client.request(r)
+            open_trades = response.get("trades", [])
+
+            for trade in open_trades:
+                if trade["instrument"] == currency_pair:
+                    trade_id = trade["id"]
+                    close_request = trades.TradeClose(self.account_id, tradeID=trade_id)
+                    close_response = self.client.request(close_request)
+
+
+                    return close_response
+            logging.error("No open trades found for", currency_pair)
+            return None
+        except V20Error as e:
+            logging.error(f"Error closing trade: {e}")
             return None

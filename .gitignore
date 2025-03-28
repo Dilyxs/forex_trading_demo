@@ -1,4 +1,4 @@
 constants.py
 oanda.cfg
-
+Oanda_logging.log
 /__pycache__

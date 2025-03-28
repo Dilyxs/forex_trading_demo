@@ -6,17 +6,8 @@ from just_class import MultiModelClassifier
 
 
 
-pairs = ["EUR_USD", "USD_CHF", 'USD_CAD', "GBP_USD", "AUD_USD", "USD_JPY", "NZD_USD" ,  "USD_CNH",
-    "USD_CZK",
-    "USD_DKK",
-    "USD_HKD",
+pairs = ["EUR_USD", "USD_CHF", 'USD_CAD', "GBP_USD", "AUD_USD", "USD_JPY", "NZD_USD" ,  
     "USD_MXN",
-    "USD_NOK",
-    "USD_PLN",
-    "USD_SEK",
-    "USD_SGD",
-    "USD_THB",
-    "USD_TRY",
     "USD_ZAR"]
 timeframe = "D"
 target = "future_close_encoded"

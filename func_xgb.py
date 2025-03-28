@@ -66,8 +66,6 @@ def df_returner(pairs):
         df_final = prediction_clas.run_all_models()
         df_final = df_final[[x for x in df_final.columns if any(y in x for y in ["close", "Prediction", "Confidence", 'time'])]]
         df_final = df_final.drop(columns = ['News_CB Consumer Confidence', 'high_close', 'low_close', 'close_above_EMA'])
-        df_final.to_csv(f"for_rl_{pair}.csv")
-    
         df_mk = get_market_sentiment(pair)
         df_mk['Date'] = pd.to_datetime(df_mk['Date']).dt.normalize()
         df_final['time'] = pd.to_datetime(df_final['time']).dt.normalize()
@@ -109,6 +107,7 @@ def for_trade_execution(df, trader):
 
 df = df_returner(pairs)
 df = trade_returner(df)
+df.to_csv("today_resul.csv")
     
 headers = {
     "Authorization": f"Bearer {API_KEY}",
@@ -117,7 +116,11 @@ headers = {
 
 try:
     trader = OANDAClient(API_KEY, ACCOUNT_ID)
-    for_trade_execution(df, trader) 
+
+    if trader.is_friday:
+        pass
+    else:
+        for_trade_execution(df, trader) 
 
 except Exception as e:
     print(f"Error executing trades - {e}")
