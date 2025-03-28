@@ -8,12 +8,10 @@ from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 import tpqoa
 from datetime import datetime, timedelta, timezone
-from cla import ModelTrainer
 from sklearn.preprocessing import OneHotEncoder
 import re
 import joblib
-import tensorflow as tf
-from tensorflow.keras.models import load_model
+
 import requests
 def remove_punctuations(s):
     if pd.isna(s) or s in ["", "Pass"]:  
@@ -1087,7 +1085,6 @@ def df_for_news(currency_pair, timeframe,ema_length = 30,shortlen = 20,longlen =
         pass
 
     merged_df.drop(columns=['Unnamed: 0'], inplace=True, errors='ignore')
-    merged_df.to_csv(f"{currency_pair}_{timeframe}_news.csv", index=False)
 
 
     merged_df = merged_df.rename(columns={"o": "open", "c": "close", "h": "high", "l": "low"})

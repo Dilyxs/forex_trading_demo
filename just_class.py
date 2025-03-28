@@ -1,13 +1,12 @@
 import ast
 import numpy as np
 import pandas as pd
-import requests
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
 import xgboost as xgb
 import lightgbm as lgb
 from functools import reduce
-from mgdb import DataDB_tracker
+from mgdb_trade_tracker import DataDB_tracker
 import os
 import joblib   
 import datetime
