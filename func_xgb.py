@@ -3,7 +3,7 @@ from elements import for_prediction_2, get_market_sentiment
 import pandas as pd
 import numpy as np
 
-from just_class import MultiModelClassifierPredict, OANDAClient
+from just_class import MultiModelClassifierPredict, OANDAClientFriday_Edition
 from constants import  API_KEY, ACCOUNT_ID
 
 
@@ -54,6 +54,7 @@ def trade_returner(df):
     [1, -1],
     default=0
 )
+    return df
 
 def df_returner(pairs):
     target = "future_close_encoded"
@@ -107,7 +108,7 @@ def for_trade_execution(df, trader):
 
 df = df_returner(pairs)
 df = trade_returner(df)
-df.to_csv("today_resul.csv")
+df.to_csv("test_err.csv")
     
 headers = {
     "Authorization": f"Bearer {API_KEY}",
@@ -115,7 +116,7 @@ headers = {
 }
 
 try:
-    trader = OANDAClient(API_KEY, ACCOUNT_ID)
+    trader = OANDAClientFriday_Edition(API_KEY, ACCOUNT_ID) #always intialize, will always check if trade needs to be closed
 
     if trader.is_friday:
         pass

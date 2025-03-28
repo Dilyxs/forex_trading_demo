@@ -11,8 +11,8 @@ from datetime import datetime, timedelta, timezone
 from sklearn.preprocessing import OneHotEncoder
 import re
 import joblib
-
 import requests
+from constants import sentiment_link, news_link
 def remove_punctuations(s):
     if pd.isna(s) or s in ["", "Pass"]:  
         return None
@@ -28,13 +28,13 @@ def remove_punctuations(s):
     return cleaned
 
 def get_market_sentiment(pair):
-    response = requests.get(f"https://sentiment.adsayan.com/SentimentData/{pair}")
+    response = requests.get(f"{sentiment_link}/{pair}")
     body = response.json()
     df = pd.DataFrame(body)
     return df
 
 def get_news():
-    response = requests.get(f"https://sentiment.adsayan.com/News")
+    response = requests.get(f"{news_link}")
     body = response.json()
     df = pd.DataFrame(body)
     return df
