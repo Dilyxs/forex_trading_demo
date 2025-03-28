@@ -2,8 +2,6 @@ from pymongo import MongoClient, errors
 from constants import mongo_conec_str
 
 
-
-
 class DataDB_tracker:
 
     FOREX_COLL = "five_days_tracker"
