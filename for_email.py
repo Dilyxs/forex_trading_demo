@@ -51,8 +51,7 @@ def df_sender(
 def df_sender_csv_attachment(
     df, 
     sender_email='adsayan206@gmail.com', 
-    receiver_email='5149189264@vmobile.ca', 
-    app_password='luze bvcz osqw rpsb', 
+    receiver_email='5149189264@vmobile.ca',
     display_name='selvan@adsayan.com'
 ):
     # Convert DataFrame to CSV and save it as a temporary file
