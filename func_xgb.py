@@ -5,7 +5,9 @@ import numpy as np
 
 from just_class import MultiModelClassifierPredict, OANDAClientFriday_Edition
 from constants import  API_KEY, ACCOUNT_ID
-
+import logging
+logging.basicConfig(filename="Oanda_logging.log",
+                            level=logging.INFO,  format='%(asctime)s - %(levelname)s - %(filename)s - %(message)s')
 
 
 
@@ -119,7 +121,7 @@ try:
     trader = OANDAClientFriday_Edition(API_KEY, ACCOUNT_ID) #always intialize, will always check if trade needs to be closed
 
     if trader.is_friday:
-        pass
+        logging.info('today is friday')
     else:
         for_trade_execution(df, trader) 
 

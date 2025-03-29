@@ -3,3 +3,4 @@ oanda.cfg
 Oanda_logging.log
 /__pycache__
 test_err.csv
+bot.log
