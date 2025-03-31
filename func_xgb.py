@@ -6,6 +6,9 @@ import numpy as np
 from just_class import MultiModelClassifierPredict, OANDAClientFriday_Edition
 from constants import  API_KEY, ACCOUNT_ID
 import logging
+import warnings
+warnings.simplefilter(action='ignore', category=pd.errors.SettingWithCopyWarning)
+
 logging.basicConfig(filename="Oanda_logging.log",
                             level=logging.INFO,  format='%(asctime)s - %(levelname)s - %(filename)s - %(message)s')
 
@@ -99,13 +102,13 @@ def for_trade_execution(df, trader):
 
         if super_direction != 0:
             if super_direction <0:
-                trader.open_trade(pair, direction = -1,risk_percentage = 2)
+                trader.place_order(pair, direction = -1,risk_percentage = 2)
 
             elif super_direction >0:
-                trader.open_trade(pair, direction = 1,risk_percentage = 2)
+                trader.place_order(pair, direction = 1,risk_percentage = 2)
 
         else:
-            trader.open_trade(pair, direction)
+            trader.place_order(pair, direction)
 
 
 df = df_returner(pairs)
