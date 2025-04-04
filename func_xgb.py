@@ -2,11 +2,13 @@ from features_dict import dict_for_features
 from elements import for_prediction_2, get_market_sentiment
 import pandas as pd
 import numpy as np
-
-from just_class import MultiModelClassifierPredict, OANDAClientFriday_Edition
+from oanda_class import OANDAClientParent,OANDAExecuter, OANDA_DB_Manager
+from just_class import MultiModelClassifierPredict
 from constants import  API_KEY, ACCOUNT_ID
 import logging
 import warnings
+import datetime
+
 warnings.simplefilter(action='ignore', category=pd.errors.SettingWithCopyWarning)
 
 logging.basicConfig(filename="Oanda_logging.log",
@@ -102,31 +104,39 @@ def for_trade_execution(df, trader):
 
         if super_direction != 0:
             if super_direction <0:
-                trader.place_order(pair, direction = -1,risk_percentage = 2)
+                trader.place_order(pair, direction = -1,risk_percentage = 1.5)
 
             elif super_direction >0:
-                trader.place_order(pair, direction = 1,risk_percentage = 2)
+                trader.place_order(pair, direction = 1,risk_percentage = 1.5)
 
         else:
             trader.place_order(pair, direction)
 
 
-df = df_returner(pairs)
-df = trade_returner(df)
-df.to_csv("test_err.csv")
-    
+
 headers = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json"
 }
 
 try:
-    trader = OANDAClientFriday_Edition(API_KEY, ACCOUNT_ID) #always intialize, will always check if trade needs to be closed
+    if  50<= datetime.datetime.utcnow().minute <=59: #script gets executed at 20:57
+        client_db = OANDA_DB_Manager(API_KEY, ACCOUNT_ID)
+        client_db.cleanup_unfilled_trades()
+        client_db.check_for_order_completion()
+        trades_required_to_be_closed = client_db.check_if_close_trade_time() #empty list most of the time
+        if len(trades_required_to_be_closed) > 0:
+            client_executer = OANDAExecuter(API_KEY, ACCOUNT_ID)
+            client_executer.close_trades(trades_required_to_be_closed)
 
-    if trader.is_friday:
-        logging.info('today is friday')
-    else:
-        for_trade_execution(df, trader) 
+
+    if  0<= datetime.datetime.utcnow().minute <=2: #script gets executed at 21:01 here
+        df = df_returner(pairs)
+        df = trade_returner(df)
+        df.to_csv("test_err.csv")
+            
+        client_executer = OANDAExecuter(API_KEY, ACCOUNT_ID)
+        for_trade_execution(df, client_executer) 
 
 except Exception as e:
     print(f"Error executing trades - {e}")
